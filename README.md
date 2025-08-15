@@ -3,17 +3,15 @@ SMOC - is messenger with end-to-end (kind of) feature, also using safe method at
 
 # Requirements to run
 
-- macOS (darwin) or Linux OS
-- Python, 3.13 as minimum recomended
-- PyPi (pip) "cryptography" library installed
-- For Termux, Linux: "sshpass" in $PATH (for termux: `pkg install sshpass`, arch linux: `pacman -Sy sshpass`, ubuntu: `apt install sshpass`)
-
-# Info: a lot things are not brought, they will be soon
+- macOS (darwin), Linux, Termux
+- Python, 3.13 as minimum recomended (for Termux: `pkg install python3`)
+- PyPi (pip) "cryptography" library installed (for Termux: pip is broken, use apt: `apt install python-cryptography`)
+- For Termux, Linux: "sshpass" in $PATH (arch linux: `pacman -Sy sshpass`, ubuntu, termux: `apt install sshpass`)
 
 # Make your own build
 
 1. Edit needed variables in build.py, build_prefernces.*
-2. Run `python3 build.py build`
+2. Run `python3 build.py`
 
 # Warning: DO NOT USE PUBLIC SERVERS, ONES YOU DON'T TRUST 
 
