@@ -8,6 +8,8 @@ SMOC - is messenger with end-to-end (kind of) feature, also using safe method at
 - PyPi (pip) "cryptography" library installed
 - For Termux, Linux: "sshpass" in $PATH (for termux: `pkg install sshpass`, arch linux: `pacman -Sy sshpass`, ubuntu: `apt install sshpass`)
 
+# Info: a lot things are not brought, they will be soon
+
 # Make your own build
 
 1. Edit needed variables in build.py, build_prefernces.*
