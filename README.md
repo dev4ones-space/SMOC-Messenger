@@ -9,7 +9,12 @@ SMOC - is messenger with end-to-end (kind of) feature, also using safe method at
 
 # Make your own build
 
-1. Run `build` (or `sh build`)
+1. Make sure you meet all basic requirements to run (Requirements to run)
+2. Install pyinstaller:
+   - For Termux: `apt install pyinstaller`
+   - For Linux: `pacman -Sy pyinstaller` or `apt install pyinstaller`
+   - For macOS (darwin): `brew install pyinstaller` (make sure brew is installed, if not - install trough their [offical website](https://brew.sh))
+3. Run `build` (or `sh build`)
 
 # Warning: DO NOT USE PUBLIC SERVERS, ONES YOU DON'T TRUST 
 
