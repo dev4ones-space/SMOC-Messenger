@@ -1,105 +1,57 @@
 # #
-import os, smessage, platform, ast, subprocess, json, re
+import os, smessage, platform, ast, subprocess, inspect, re, paramiko
 from wopw import *
 from typing import Dict, Any
 class main:
     # Variables
     SNFail = False
-    SupportedPlatforms = ['Darwin']
+    SupportedPlatforms = ['Darwin', 'Linux', 'Windows']
     # Classes
     class version:
         Version = 1.0
         VersionType = 'Beta' # Alpha, Beta, Release
-        BuildCount = 1
+        BuildCount = 3
         Build = f'{str(Version).replace('.', '')}{VersionType[0]}{BuildCount}'
         All = f'Version: {Version}\nVersion Type: {VersionType}\nBuild: {Build}'
     class activities:
-        def CreateLocalChat(): 
-            progress('Creating...')
-            cache = input('Name of chat (local): ')
-            cache1 = input('Codename of chat (read more about at "help" command): ')
-            cache2 = input('Password for local chat: ')
-            cache3 = input('Password for online syncing (blank or any if using in offline mode): ')
-            progress('Creaing...')
-            os.system(f'mkdir {cache}')
-            open(f'{cache}/chat.smoc', 'w').write(str(smessage.main.activities.Encrypt(f'{color.foreground_st.blue}=+= Start of chat =+={color.end}', cache2)))
-            open(f'{cache}/chat-conf.smoc', 'w').write(str({
-                'chat-codename': f'{smessage.main.activities.Encrypt(cache1, cache2)}',
-                'sync-passwd': f'{smessage.main.activities.Encrypt(cache3, cache2)}'
+        def MakeChat_TUI(chat_name: str): 
+            progress('Creating chat...')
+            codename = input('Codename of chat ("$CHAT_NAME" to use chat name as codename): ')
+            if codename.find('$CHAT_NAME') != -1: codename = chat_name.lower()
+            chat_passwd = input('Password to encrypt/decrypt chat (blank for no protection, dangerous): ')
+            online_sync_passwd = input('Password for online syncing (if using Offline mode, will do nothing): ')
+            progress('Making...')
+            try: os.mkdir(chat_name) # For cross-platform
+            except FileExistsError: 
+                if input(f'{err} got FileExistsError. Delete file/dir "{chat_name}"? [y/n]: ') in ['y', 'Y']: 
+                    os.rmdir(chat_name)
+                    os.mkdir(chat_name)
+            open(f'{chat_name}/chat.smoc', 'w').write(str(smessage.main.activities.Encrypt(f'{color.foreground_st.blue}=+=     Start of chat     =+={color.end}\n', chat_passwd)))
+            open(f'{chat_name}/chat-conf.smoc', 'w').write(str({
+                'codename': f'{smessage.main.activities.Encrypt(codename, chat_passwd)}',
+                'sync-passwd': f'{smessage.main.activities.Encrypt(online_sync_passwd, chat_passwd)}'
             }))
-            prompt('Done!')
         @staticmethod
-        def Dict(source: str) -> Dict[str, Any]: # deepseek fixed full function (rewrited it)
-            """
-            Converts a string (or file content) into a Python dict, even if keys are unquoted.
-            
-            Handles:
-            - Standard JSON (`{"key": "value"}`)
-            - Python-style (`{'key': 'value'}`)
-            - Unquoted keys (`{key: value}`)
-            - Files containing such strings
-            
-            Args:
-                source: File path or string containing dictionary data.
-                
-            Returns:
-                Parsed dictionary.
-                
-            Raises:
-                ValueError: If parsing fails.
-                FileNotFoundError: If source is a file path and doesn't exist.
-            """
+        def Dict(source: str) -> Dict[str, Any]: # This function was fully rewrited by Deepseek AI
             try:
-                # Read content if source is a file
                 if os.path.exists(source):
-                    with open(source, "r", encoding="utf-8") as f:
-                        content = f.read().strip()
-                else:
-                    content = source.strip()
-
-                if not content:
-                    raise ValueError("Empty content provided")
-
-                # Case 1: Already valid Python/JSON dict (quoted keys)
-                try:
-                    return ast.literal_eval(content)
-                except (SyntaxError, ValueError):
-                    pass  # Fall through to unquoted key handling
-
-                # Case 2: Fix unquoted keys (e.g., `{encrypted: value}`)
-                # Step 1: Wrap unquoted keys in quotes
-                fixed_content = re.sub(
-                    r'([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)',
-                    r'\1"\2"\3',
-                    content
-                )
-                
-                # Step 2: Ensure string values are quoted (if they aren't already)
-                fixed_content = re.sub(
-                    r':\s*([a-zA-Z0-9_]+)([,\}])',
-                    r': "\1"\2',
-                    fixed_content
-                )
-
-                # Try parsing again
-                try:
-                    return ast.literal_eval(fixed_content)
-                except (SyntaxError, ValueError) as e:
-                    raise ValueError(f"Failed to parse dictionary (invalid format): {str(e)}")
-
+                    with open(source, "r", encoding="utf-8") as f: content = f.read().strip()
+                else: content = source.strip()
+                if not content: raise ValueError("Empty content provided")
+                try: return ast.literal_eval(content)
+                except (SyntaxError, ValueError): pass
+                fixed_content = re.sub(r'([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)', r'\1"\2"\3', content)
+                fixed_content = re.sub(r':\s*([a-zA-Z0-9_]+)([,\}])', r': "\1"\2', fixed_content)
+                try: return ast.literal_eval(fixed_content)
+                except (SyntaxError, ValueError) as e: raise ValueError(f"Failed to parse dictionary (invalid format): {str(e)}")
             except FileNotFoundError:
                 raise FileNotFoundError(f"File not found: {source}")
             except Exception as e:
                 raise ValueError(f"Unexpected error parsing dictionary: {str(e)}")
-        ReadInDict = Dict
         def UnsupportedOS():
             prompt('Sorry, this project only supports macOS. Due problems with libs (wopw is macOS only). On stable release, Windows/Linux/Termux supoort will be brought.')
             exit()
-        def ReadRemoteFileSSH(done_data_dict: dict, file: str):
-            'Reads file on remote machine trough SSH, then trough "cat". File is not transfered, only reads (no security leaks)'
-            data = done_data_dict
-            return str(subprocess.check_output(f'./sshpass -p "{data['passwd']}" ssh {data['user']}@{data['domain']} -p {data['port']} "cat {file}"', shell=True).decode())
-        def CreateMainFile(mode: str, username: str | None = None, domain: str | None = None, port: int | None = None, user: str | None = None, passwd: str | None = None, encrypt_passswd: str | None = None, sn: str | None = None):
+        def MakeMainFile(mode: str, username: str | None = None, domain: str | None = None, port: int | None = None, user: str | None = None, passwd: str | None = None, encrypt_passswd: str | None = None, sn: str | None = None):
             if mode == 'Offline':
                 return {
                     'mode': 'Offline', 
@@ -124,84 +76,112 @@ class main:
                     'user': user,
                     'passwd': passwd
                 }
-        def CreateServerMain():
-            if input('Do offline? (to transfer chat locally) [y/n]: ') in ['y', 'Y']:
-                out = main.activities.CreateMainFile('Offline')
+        def __GetAllActivities__():  # Artazon func
+            if main.activities.control.map.get('__GetAllActivities__') != True: 
+                main.activities.control.TurnedOff()
+                return -90
+            funcs = [name for name, func in inspect.getmembers(main.activities, inspect.isfunction)]
+            funcs.append('__GetAllActivities__')
+            return funcs
+        def __RunActivity__(name, *args, **kwargs):  # Artazon func
+            if main.activities.control.map.get('__RunActivity__') != True: 
+                main.activities.control.TurnedOff()
+                return -90
+            funcs = dict(inspect.getmembers(main.activities, inspect.isfunction))
+            if name not in funcs:
+                raise ValueError(f"Activity '{name}' not found.")
+            return funcs[name](*args, **kwargs)
+        def AdvancedMenu():
+            cache = input('Advanced Menu\n\n\n 1: List activities\n 2: Run activity\n 3: App info\n\nSelect: ')
+            cls()
+            if cache.find('1') != -1: 
+                cls()
+                prompt('\n'.join(act.__GetAllActivities__()).replace('__GetAllActivities__', ''))
+            elif cache.find('2') != -1:
+                cls()
+                cache = input('Activity: ')
+                cache1 = input('Arg (%N to use without args): ')
+                if cache1.find('%N') != -1: cache = act.__RunActivity__(cache)
+                else: cache = act.__RunActivity__(cache, cache1)
+                prompt(f'Activity exit code: {cache}\nDone!')
+            elif cache.find('3') != -1: input(f'{main.version.All}\n\nThis advanced menu was taken and set from Artazon\n\npress enter to exit')
+            else: input('Wrong option!')
+        def MakeMainFile_TUI(sn):
+            if input('Use offline? (to transfer chat locally) [y/n]: ') in ['y', 'Y']: out = act.MakeMainFile('Offline')
             else:
-                if input('SMOC remote chats uses SSH protocol to transfer data (encrypted), auth will be made only with password (entered data will be double encrypted, and will be exclusive to current machine).\nWarning: DO NOT USE SERVERS YOU DONT TRUST, OR PUBLIC ONES\n Do you want to continue? [y/n]: ') not in ['y', 'Y']:
-                    out = main.activities.CreateMainFile('Offline')
+                if input('SMOC Online (Sync) mode uses SSH protocol to transfer messages (if using offical builds, messages will be automatically encrypted).\nNotice: To prevent data leaks, proceed with those rules: \n  Only use servers you trust\n  Mass-user server is dangerous(tampering server, making logs, saving data danger)\n\n Do you want to continue? [y/n]: ') not in ['y', 'Y']: out = act.MakeMainFile('Offline')
                 else:
-                    progress('Finding current machine serial number...')
-                    sn = machine.GetSerialNumber()
                     if sn == -1: 
-                        input(f'{err} Machine serial number was not found. Press enter to continue with offline mode, to abort - ctrl+c')
-                        out = main.activities.CreateMainFile('Offline')
+                        input(f"{err} wopw: serial number of current machine can't be found. SMOC uses double-layer encryption for connection data (main.smoc), and it requires SN to be found.\nWithout SN you cannot use Sync/Online mode by security reasons\n\npress enter to continue, CTRL+C to abort")
+                        out = act.MakeMainFile('Offline')
                     else:
-                        cache = input('Domain name of server (or IP): ')
-                        cache1 = input('Port (make sure it works with SSH): ')
-                        cache2 = input(f'User of {cache}(recomended using user with rbash, if it, "cat" is required): ')
-                        cache3 = input(f'Password of {cache2}: ')
-                        cache4 = input('Username (will be shown in chats): ')
-                        cache5 = input('Password for second-layer encryption (any, recomended 8 digits or more): ')
-                        out = main.activities.CreateMainFile('Sync', cache4, cache, cache1, cache2, cache3, cache5, sn)
+                        domain = input('Domain name of server (or IP address): ')
+                        port = input('Port: ')
+                        user = input(f'User of {domain} (see recomendations on GitHub page or in source info.txt): ')
+                        passwd = input(f'Password of {user}: ')
+                        current_user = input('Username (will be used for chat): ')
+                        encryption_passwd = input('Password for data encryption (read more at info.txt or GitHub page): ')
+                        out = act.MakeMainFile('Sync', current_user, domain, port, user, passwd, encryption_passwd, sn)
             progress('Writing .smoc main file')
             open('main.smoc', 'w').write(str(out))
 progress = lambda text: print(f'{color.foreground_st.blue}==>{color.end} {font.bold}{text}{font.end}')
 prompt = dev4ones_modules.DefExitPrompt
 err = f'{color.foreground_st.red}error:{color.end}'
-error = None
-att = 0
-act = main.activities
+ssh = paramiko.SSHClient()
+ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+error = None # To abort error on: except EOFError: ... ; when in normal version: except Exception as error:;
+connection_attempts = 0 # Attemps for reconnecting to server (in chat)
+act = main.activities # Shortcut
 # # Pre-run
 if __name__ != '__main__': exit()  # To abort launching TUI, if using in import
-if platform.system() not in main.SupportedPlatforms: main.activities.UnsupportedOS()
-# # Binding server
-progress('Finding main.smoc...')
-try: 
-    server_main = act.Dict('main.smoc')
-    if server_main == -3: raise FileNotFoundError
-except FileNotFoundError: 
-    if input(f'{err} server connection info was not found. Create now? [y/n]: ') in ['y', 'Y']: act.CreateServerMain()
-    progress('Finding main.smoc...')
-    try: server_main = act.Dict('main.smoc')
-    except: raise IndexError('No server-main.smoc was found after creating activity was runned.')
+if platform.system() not in main.SupportedPlatforms: act.UnsupportedOS()
 # # Reading SN
-progress('Reading serial number for "Sync" mode...')
+progress('Reading serial number...')
 sn = machine.GetSerialNumber()
 if sn == -1:
     print(f'{err} reading failed... Offline mode only available.')
     main.SNFail = True
+    sn = 0
+# # Reading main.smoc
+progress('Reading main.smoc...')
+try: 
+    main_data = act.Dict('main.smoc')
+    if main_data == -3: raise FileNotFoundError
+except: 
+    if input(f'{err} main file (main.smoc) was not found. Create it? [y/n]: ') in ['y', 'Y']: act.MakeMainFile_TUI(sn)
+    progress('Reading main.smoc...')
+    try: main_data = act.Dict('main.smoc')
+    except: raise IndexError('main.smoc was not found after successfully runned activity MakeMainFile_TUI')
 # Main
 while True:
     try: 
         while True: 
             cls()
-            chat_name = input('Local chat name to open ("help" to get info): ')
+            chat_name = input('Chat name to open ("i" for advanced menu): ')
             cls()
-            if chat_name == 'help': prompt('Help menu\n\nCodename of chat is used to tie up sessions to receive new messages. It will be located on server as (example of): remote-server/home/remote-user/SMOCServerClient/codenames-tie/starkill.tie\nPassword for local chats used to encrypt them, nad make hard to read without password (keep password in secret)\nPassword for online chats used to encrypt message between person to read chat (password must be shared to read chat)\n\nIn chat:\n\nPress enter to try receiving an message from server')
-            else:
-                cache = chat_name
-                progress('Finding local chat...')
-                try: chat = open(f'{cache}/chat.smoc')
+            if chat_name == 'i': act.AdvancedMenu()
+            else: 
+                progress('Reading chat...')
+                try: chat = open(f'{chat_name}/chat.smoc')
                 except FileNotFoundError: 
-                    if input(f'{err} chat was not found. Create new chat? [y/n]: ') in ['y', 'Y']: main.activities.CreateLocalChat()
+                    if input(f'{err} chat was not found. Create new chat? [y/n]: ') in ['y', 'Y']: act.MakeChat_TUI(chat_name)
                     else: break
-                chat_passwd = input('Password for decrypt: ')
+                chat_passwd = input('Password to decrypt chat: ')
                 progress('Decrypting chat...')
-                try: chat = smessage.main.activities.Decrypt(main.activities.ReadInDict(f'{cache}/chat.smoc'), chat_passwd)
+                try: chat = smessage.main.activities.Decrypt(main.activities.Dict(f'{chat_name}/chat.smoc'), chat_passwd)
                 except: 
-                    prompt(f'{err} password is wrong.')
+                    prompt(f'{err} password for decrypt is wrong.')
                     break
                 cls()
-                if server_main['mode'] == 'Sync':
-                    progress('Decrypting data for syncing...')
-                    cache = input('Password for decrypting syncing data: ')
+                if main_data['mode'] == 'Sync':
+                    progress('Decrypting data...')
+                    cache = input('Password to decrypt data for syncing: ')
                     progress('Decrypting first layer...')
                     try: done_data = {
-                        'domain': smessage.main.activities.Decrypt(server_main['domain'], sn), 
-                        'port': smessage.main.activities.Decrypt(server_main['port'], sn),
-                        'user': smessage.main.activities.Decrypt(server_main['user'], sn),
-                        'passwd': smessage.main.activities.Decrypt(server_main['passwd'], sn)
+                        'domain': smessage.main.activities.Decrypt(main_data['domain'], sn), 
+                        'port': smessage.main.activities.Decrypt(main_data['port'], sn),
+                        'user': smessage.main.activities.Decrypt(main_data['user'], sn),
+                        'passwd': smessage.main.activities.Decrypt(main_data['passwd'], sn)
                     }
                     except: 
                         prompt(f'{err} failed to decrypt. Possible reasons: main.smoc created on different machine, corrupted data')
@@ -216,35 +196,39 @@ while True:
                     except: 
                         prompt(f'{err} failed to decrypt. Possible reasons: wrong password, corrupted data')
                         break
-                chat_conf = act.ReadInDict(f'{chat_name}/chat-conf.smoc')
+                progress('Decrypting chat conf...')
+                chat_conf = act.Dict(f'{chat_name}/chat-conf.smoc')
                 chat_conf = {
-                    'chat-codename': smessage.main.activities.Decrypt(chat_conf['chat-codename'], chat_passwd),
+                    'codename': smessage.main.activities.Decrypt(chat_conf['codename'], chat_passwd),
                     'sync-passwd': smessage.main.activities.Decrypt(chat_conf['sync-passwd'], chat_passwd)
                 }
                 while True:
                     try:
                         cls()
-                        cache = input(f'{chat}\n\n | Message: ')
+                        cache = input(f'{chat}\n\n  {color.foreground_st.green}Message:{color.end} ')
                         cls()
                         if cache in ['', ' ']: 
                             progress('Syncing chat...')
-                            if server_main['mode'] == 'Offline': 
-                                chat = act.ReadInDict(f'{chat_name}/chat.smoc')
+                            if main_data['mode'] == 'Offline': 
+                                chat = act.Dict(f'{chat_name}/chat.smoc')
                                 chat = smessage.main.activities.Decrypt(chat, chat_passwd)
                             else:
-                                while True: 
-                                    try: 
-                                        cache = subprocess.check_output(f'./sshpass -p "{done_data['passwd']}" ssh {done_data['user']}@{done_data['domain']} -p {done_data['port']} "python3 /home/{done_data['user']}/SMOC-Server/server.py receive {chat_conf['chat-codename']} {server_main['current_user']}"', shell=True).decode()
-                                        break
-                                    except subprocess.CalledProcessError: 
-                                        if att >= 5: raise TabError
-                                        att += 1
-                                        progress(f'Failed to connect to server trying again... (att={att})')
-                                if cache.replace('\n', '') == '-1': raise EOFError
+                                try: 
+                                    ssh.connect(done_data['domain'], done_data['port'], done_data['user'], done_data['passwd'])
+                                    stdin, stdout, stderr = ssh.exec_command(f'python3 /home/{done_data['user']}/SMOC-Server/server.py receive {chat_conf['codename']} {main_data['current_user']}')
+                                    for line in stdout: cache += line.strip()
+                                except paramiko.SSHException as e: 
+                                    prompt(f'Connection failed...\n\nParamiko error: {e}')
+                                    raise EOFError
+                                if cache.replace('\n', '') == '-1': raise EOFError # No messages was found
                                 else: 
-                                    cache = act.Dict(cache)
                                     progress('Got new message! Decrypting...')
-                                    try: cache = smessage.main.activities.Decrypt(cache, chat_conf['sync-passwd'])
+                                    try: 
+                                        cache1 = act.Dict(cache)
+                                        cache = smessage.main.activities.Decrypt(cache1, chat_conf['sync-passwd'])
+                                    except ValueError:
+                                        if input('Looking like message received is unencrypted. Do you want to read it? [y/n]: ') in ['y', 'Y']: cache = f'({color.foreground_st.red}unencrypted{color.end}) {cache}'
+                                        else: raise EOFError
                                     except: 
                                         prompt(f'{err} looking like password for online syncing is wrong.')
                                         raise EOFError
@@ -255,10 +239,16 @@ while True:
                         else: 
                             cache1 = input('Send to: ')
                             progress('Sending message to server...')
-                            cache2 = f'{color.foreground_st.blue}{server_main['current_user']}{color.end}: {cache}'
+                            cache2 = f'{color.foreground_st.blue}{main_data['current_user']}{color.end}: {cache}'
                             message = smessage.main.activities.Encrypt(cache2, chat_conf['sync-passwd'])
-                            os.system(f'''./sshpass -p "{done_data['passwd']}" ssh {done_data['user']}@{done_data['domain']} -p {done_data['port']} "python3 /home/{done_data['user']}/SMOC-Server/server.py send {chat_conf['chat-codename']} '{message}' {cache1}"''')
-                            prompt()
+                            try: 
+                                ssh.connect(done_data['domain'], done_data['port'], done_data['user'], done_data['passwd'])
+                                stdin, stdout, stderr = ssh.exec_command(f"python3 /home/{done_data['user']}/SMOC-Server/server.py send {chat_conf['codename']} '{message}' {cache1}")
+                                for line in stdout: cache += line.strip()
+                            except paramiko.SSHException as e: 
+                                prompt(f'Connection failed...\n\nParamiko error: {e}')
+                                raise EOFError
+                            #os.system(f'''./sshpass -p "{done_data['passwd']}" ssh {done_data['user']}@{done_data['domain']} -p {done_data['port']} "python3 /home/{done_data['user']}/SMOC-Server/server.py send {chat_conf['codename']} '{message}' {cache1}"''')
                             chat = f'{chat}\n{cache2}'
                             progress('Writing changes to local chat...')
                             cache = smessage.main.activities.Encrypt(chat, chat_passwd)
@@ -266,11 +256,14 @@ while True:
                     except EOFError: pass
     except EOFError: pass 
     except KeyboardInterrupt: 
-        if input('\nExit? [y/n]: ') in ['y', 'Y']: 
+        try: 
+            if input('\nExit? [y/n]: ') in ['y', 'Y']: 
+                cls()
+                raise RuntimeError
+        except RuntimeError: exit()
+        except: pass
+    except EOFError:  # EOFError  #Exception as error
+        try:
             cls()
-            exit()
-    except TabError: 
-        prompt('Cannot connect to server, exiting.')
-    except Exception as error:  # EOFError:
-        cls()
-        prompt(f'Unexcepted error occured: {error}')
+            prompt(f'Unexcepted error occured: {error}')
+        except: pass
