@@ -1,7 +1,8 @@
 # #
-import os, smessage, platform, ast, subprocess, inspect, re, paramiko
+import os, smessage, platform, ast, inspect, re, paramiko
 from wopw import *
 from typing import Dict, Any
+from ast import literal_eval
 class main:
     # Variables
     SNFail = False
@@ -10,7 +11,7 @@ class main:
     class version:
         Version = 1.0
         VersionType = 'Beta' # Alpha, Beta, Release
-        BuildCount = 3
+        BuildCount = 4
         Build = f'{str(Version).replace('.', '')}{VersionType[0]}{BuildCount}'
         All = f'Version: {Version}\nVersion Type: {VersionType}\nBuild: {Build}'
     class activities:
@@ -91,6 +92,31 @@ class main:
             if name not in funcs:
                 raise ValueError(f"Activity '{name}' not found.")
             return funcs[name](*args, **kwargs)
+        def parse_encrypted_string(encrypted_str): # Deepseek's created func
+            results = []
+            dict_strings = re.findall(r'\{.*?\}', encrypted_str)
+            for dict_str in dict_strings:
+                try: data = literal_eval(dict_str)
+                except (SyntaxError, ValueError):
+                    try:
+                        fixed = re.sub(r'([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:\s*)([^"\',}][^,}]*)',
+                                    r'\1"\2"\3"\4"', 
+                                    dict_str)
+                        data = literal_eval(fixed)
+                    except (SyntaxError, ValueError) as e:
+                        print(f"Failed to parse dictionary: {dict_str}\nError: {e}")
+                        continue
+                results.append(data)
+            return results
+        def DecryptChatReceived(EncryptedChat, decrypt_passwd):  # Deepseek's created func
+            encrypted_data = act.parse_encrypted_string(EncryptedChat)
+            decrypted_lines = []
+            for data in encrypted_data:
+                try:
+                    decrypted = smessage.main.activities.Decrypt(data, decrypt_passwd)
+                    decrypted_lines.append(decrypted)
+                except Exception as e: print(f"Failed to decrypt: {data}\nError: {e}")
+            return '\n'.join(decrypted_lines)
         def AdvancedMenu():
             cache = input('Advanced Menu\n\n\n 1: List activities\n 2: Run activity\n 3: App info\n\nSelect: ')
             cls()
@@ -223,13 +249,11 @@ while True:
                                 if cache.replace('\n', '') == '-1': raise EOFError # No messages was found
                                 else: 
                                     progress('Got new message! Decrypting...')
-                                    try: 
-                                        cache1 = act.Dict(cache)
-                                        cache = smessage.main.activities.Decrypt(cache1, chat_conf['sync-passwd'])
+                                    try: cache = act.DecryptChatReceived(cache, chat_conf['sync-passwd'])
                                     except ValueError:
                                         if input('Looking like message received is unencrypted. Do you want to read it? [y/n]: ') in ['y', 'Y']: cache = f'({color.foreground_st.red}unencrypted{color.end}) {cache}'
                                         else: raise EOFError
-                                    except: 
+                                    except RuntimeError: 
                                         prompt(f'{err} looking like password for online syncing is wrong.')
                                         raise EOFError
                                     chat = f'{chat}\n{cache}'
@@ -262,7 +286,7 @@ while True:
                 raise RuntimeError
         except RuntimeError: exit()
         except: pass
-    except EOFError:  # EOFError  #Exception as error
+    except Exception as error:  # EOFError  #Exception as error
         try:
             cls()
             prompt(f'Unexcepted error occured: {error}')
