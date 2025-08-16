@@ -14,7 +14,7 @@ SMOC - is messenger with end-to-end (kind of) feature, also using safe method at
    - For Termux: `apt install pyinstaller`
    - For Linux: `pacman -Sy pyinstaller` or `apt install pyinstaller`
    - For macOS (darwin): `brew install pyinstaller` (make sure brew is installed, if not - install trough their [offical website](https://brew.sh))
-3. Run `build` (or `sh build`)
+3. Run `./build.sh` (or `sh build.sh`)
 
 # Warning: DO NOT USE PUBLIC SERVERS, ONES YOU DON'T TRUST 
 
