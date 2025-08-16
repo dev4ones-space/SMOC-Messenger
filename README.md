@@ -2,7 +2,7 @@
 SMOC - is messenger with end-to-end (kind of) feature, also using safe method at sending new messages to other people - fernet.
 
 # Requirements to run
-
+*to run released binary you don't need to have installed python, or modules (PyPi libaries)
 - macOS (darwin), Linux, Termux
 - Python, 3.13 as minimum recomended (for Termux: `pkg install python3`)
 - PyPi (pip) "cryptography" and "paramiko" libraries installed (for Termux: pip is broken, to install all required libs, run `sh termux-install.sh`)
