@@ -11,7 +11,7 @@ class main:
     class version:
         Version = 1.0
         VersionType = 'Beta' # Alpha, Beta, Release
-        BuildCount = 4
+        BuildCount = 5
         Build = f'{str(Version).replace('.', '')}{VersionType[0]}{BuildCount}'
         All = f'Version: {Version}\nVersion Type: {VersionType}\nBuild: {Build}'
     class activities:
@@ -242,20 +242,18 @@ while True:
                                 try: 
                                     ssh.connect(done_data['domain'], done_data['port'], done_data['user'], done_data['passwd'])
                                     stdin, stdout, stderr = ssh.exec_command(f'python3 /home/{done_data['user']}/SMOC-Server/server.py receive {chat_conf['codename']} {main_data['current_user']}')
-                                    for line in stdout: cache += line.strip()
+                                    got = ''
+                                    for line in stdout: got += line.strip()
                                 except paramiko.SSHException as e: 
                                     prompt(f'Connection failed...\n\nParamiko error: {e}')
                                     raise EOFError
-                                if cache.replace('\n', '') == '-1': raise EOFError # No messages was found
+                                if got.replace('\n', '') == '-1': raise EOFError # No messages was found
                                 else: 
                                     progress('Got new message! Decrypting...')
-                                    try: cache = act.DecryptChatReceived(cache, chat_conf['sync-passwd'])
-                                    except ValueError:
-                                        if input('Looking like message received is unencrypted. Do you want to read it? [y/n]: ') in ['y', 'Y']: cache = f'({color.foreground_st.red}unencrypted{color.end}) {cache}'
+                                    cache = act.DecryptChatReceived(got, chat_conf['sync-passwd'])
+                                    if cache == '': 
+                                        if input('Looking like received message is unencrypted. Do you want to read it? [y/n]: ') in ['y', 'Y']: cache = f'({color.foreground_st.red}unencrypted{color.end}) {got}'
                                         else: raise EOFError
-                                    except RuntimeError: 
-                                        prompt(f'{err} looking like password for online syncing is wrong.')
-                                        raise EOFError
                                     chat = f'{chat}\n{cache}'
                                     progress('Writing changes to local chat...')
                                     cache = smessage.main.activities.Encrypt(chat, chat_passwd)
