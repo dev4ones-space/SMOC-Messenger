@@ -13,7 +13,7 @@ except ModuleNotFoundError:
 class main:
     # Variables
     SNFail = False
-    SupportedPlatforms = ['Darwin', 'Linux']
+    SupportedPlatforms = ['Darwin', 'Linux', 'Windows']
     RaiseErrorWhenHappen = False
     main_conf = {}
     # Classes
