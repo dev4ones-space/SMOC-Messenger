@@ -1,16 +1,17 @@
 class wopw:
     '# Internal class for checking version, imports (for funcs)\n\nVariables:\n\n- Version: int; a version in int for CheckVersion()\n- VersionType: str; an version type like beta or release\n- BuildCount: int; for counting build (ex. 10A1; where 1 is BuildCount)\n- Build: str; just a build'
-    import subprocess, platform, os, sys
+    import subprocess, platform, os
     Version = 1.0
-    VersionType = 'Beta' # Alpha, Beta, Release
-    BuildCount = 2
+    VersionType = 'Release' # Alpha, Beta, Release
+    BuildCount = 1
     Build = f'{str(Version).replace('.', '')}{VersionType[0]}{BuildCount}'
     # Variables
     OS = platform.system()
     OSVersion = platform.release()
-    
     # Modules/Classes
     def CheckVersion():
+        '# Disabled for now, fixing website requests directory'
+        return -3
         '''# Requires module "requests" and internet connection
 # Checks for lastest version of Wopw
 
@@ -66,7 +67,7 @@ class AppleScript:
             applescript = f'{applescript} sound name "{Sound}"'
         return wopw.subprocess.check_output(f"osascript -e '{applescript}'", shell=True).decode('ascii')
 def cls():
-    '# Clears terminal screen\n# Supports: Windows, Linux, macOS (Darwin)'
+    '# Clears terminal screen\n# Supports: macOS (Darwin), Linux (Termux too), Windows'
     if wopw.OS == 'Windows': wopw.os.system('cls')
     else: wopw.os.system('clear')
 class machine:
@@ -103,10 +104,10 @@ class machine:
                 return serial
             except: return -1
 class dev4ones_modules:
-    '# Supports: macOS (Darwin), Windows, Linux\n# Compilation of module from projects of dev4ones (author of this module)'
+    '# Supports: All (who supports python)\n# Compilation of module from projects of dev4ones (author of this module)'
     def DefExitPrompt(text: str | None = 'Done!'): input(f'{text}\n\npress enter to exit')
 class color:
-    '# Supports: macOS (Darwin)\n# Colors for print\n\nExample usage:\n\nprint(f"{print.foreground_st.blue}Proccessing{print.end}") - will display "Proccessing" in blue color'
+    '# Supports: macOS (Darwin), Linux (Termux too), Windows\n# Colors for print\n\nExample usage:\n\nprint(f"{print.foreground_st.blue}Proccessing{print.end}") - will display "Proccessing" in blue color'
     class foreground_st:
         '# Start foreground of colors\nUsed to start color of text'
         black = '\033[30m'
@@ -129,7 +130,7 @@ class color:
         white = '\033[47m'
     end = '\033[0m'
 class font:
-    '# Supports: macOS (Darwin)\n# Example usage: print(f"{font.bold}bold{font.end} default text")\nResult: **bold** default text'
+    '# Supports: macOS (Darwin), Linux (Termux too), Windows (can not to)\n# Example usage: print(f"{font.bold}bold{font.end} default text")\nResult: **bold** default text'
     bold = '\033[1m'
     dim_faint = '\033[2m'
     italic = '\033[3m'
