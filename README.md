@@ -17,9 +17,7 @@ SMOC - is messenger with end-to-end (kind of) feature, also using safe method at
 3. Run `./build.sh` (or `sh build.sh`)
 
 # Warning: DO NOT USE PUBLIC SERVERS, ONES YOU DON'T TRUST 
-
-# App still in beta/alpha developing. Please report all bugs onto GutHub Issues or on mine email: q@dev4ones.space
-
+# [Documentation](https://dev4ones.space/documentation/smoc) (will be completed soon)
 # Other info:
 
 **When creating chat**
