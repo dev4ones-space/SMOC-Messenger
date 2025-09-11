@@ -19,8 +19,9 @@ class main:
     # Classes
     class version:
         Version = 1.0
-        VersionType = 'Beta' # Alpha, Beta, Release
-        BuildCount = 7
+        Mode = 'DoneRun' # 2 States only: NonPublic, DoneRun
+        VersionType = 'Release' # Alpha, Beta, Release
+        BuildCount = 1
         Build = f'{str(Version).replace('.', '')}{VersionType[0]}{BuildCount}'
         All = f'Version: {Version}\nVersion Type: {VersionType}\nBuild: {Build}'
         class InternalShell:
@@ -88,7 +89,7 @@ class main:
             except FileNotFoundError: raise FileNotFoundError(f"File not found: {source}")
             except Exception as e: raise ValueError(f"Unexpected error parsing dictionary: {str(e)}")
         def UnsupportedOS():
-            prompt('Sorry, this project only supports macOS, Linux (also Termux for Google Android devices). Due problems with libs (wopw is macOS, and partically Linux only).')
+            prompt('Sorry, this project only supports macOS, Linux (also Termux for Google Android devices), Windows. Try using VM or other methods. Run on your own risk')
             exit()
         def MakeMainConfigurationFile(username: str | None = None, domain: str | None = None, port: int | None = None, user: str | None = None, passwd: str | None = None, encrypt_passswd: str | None = None, sn: str | None = None):
             progress('Encrypting first layer (by password)...')
@@ -147,7 +148,7 @@ class main:
                     if cache == 'log.State': main.log.State = bool(cache1)
                     elif cache == 'current_user': main.main_conf[cache] = cache1
                 elif cache.find('write-changes') != -1:
-                    cache = open('Password of config: ')
+                    cache = input('Password of config: ')
                     progress('Encrypting data...')
                     open('main.smoc', 'w').write(str(smessage.main.activities.Encrypt(main.main_conf, cache)))
                 elif cache.find('exit') != -1: break
@@ -171,7 +172,7 @@ class main:
             else: input('Wrong option!')
         def MakeMainConfigurationFile_TUI(sn: str):
             'Returns:\n\n- **-4: aborted by user - didnt agree with SMOC sync method**\n- **-5: aborted by user - didnt agree to user one layer encryption**'
-            if input('Please read all following warnings, info:\n\n SMOC Messenger uses SSH (paramiko to connect, previosly sshpass) to connect to machine (should be Linux, recomended Manjaro Sway for server), and runs server.py (read more at GitHub, branch server)\n Do you want to continue? [y/n]: ') not in ['y', 'Y']: return -4
+            if input('Please read all following warnings, info:\n\n SMOC Messenger uses SSH (paramiko to connect, previosly sshpass) to connect to machine (should be Linux, read more at GitHub repo)\n Using servers you dont owe or have any control of is dangerous - modifed server.py or other tampering\n Do you want to continue? [y/n]: ') not in ['y', 'Y']: return -4
             else:
                 if sn == -1: 
                     if input(f"{err} machine's serial number cannot be found. SMOC only uses online SSH syncing, where SN is required for main configuration file (or local chats in future). Do you wan't to continue (will use only one encryption layer)? [y/n]: ") not in ['y', 'Y']: return -5
@@ -204,8 +205,8 @@ if platform.system() not in main.SupportedPlatforms:
 log('debug', 'Reading SN...', 'prerun')
 progress('Reading serial number...')
 sn = machine.GetSerialNumber()
-if sn == -1:
-    log('error', 'Failed to read serial number (wopw.machine.GetSerialNumber return -1, which is exception when it cannot find SN)', 'prerun')
+if sn == -1 or sn in ['', ' ', None]:
+    log('error', 'Failed to read serial number (wopw.machine.GetSerialNumber return -1 or blank, which is exception when it cannot find SN)', 'prerun')
     print(f'{err} reading failed... One layer encryption/decryption available only')
     sn = ''
 # # Reading main.smoc
@@ -216,7 +217,10 @@ try:
     if main.main_conf == -3: raise FileNotFoundError
 except Exception as e: 
     log('error', f'Excepted error: {e}', 'prerun')
-    if input(f'{err} main conf file (main.smoc) was not found. Create it? [y/n]: ') in ['y', 'Y']: act.MakeMainConfigurationFile_TUI(sn)
+    if input(f'{err} main conf file (main.smoc) was not found. Create it? [y/n]: ') in ['y', 'Y']: 
+        if act.MakeMainConfigurationFile_TUI(sn) == -4: 
+            print('Main configuration file abort.')
+            exit()
     progress('Reading main.smoc...')
     try: main.main_conf = act.Dict('main.smoc')
     except: exit()
@@ -282,7 +286,7 @@ while True:
                 while True:
                     try:
                         cls()
-                        cache = input(f'{chat}\n\n  {color.foreground_st.green}Message:{color.end} ')
+                        cache = input(f'{chat}\n\n  {color.foreground_st.green}{font.bold}Message:{color.end} ')
                         if cache in ['', ' ']: 
                             cls()
                             log('debug', 'Syncing chat...', 'runtime')
@@ -343,6 +347,13 @@ while True:
                             cache = smessage.main.activities.Encrypt(chat, chat_passwd)
                             open(f'{chat_name}/chat.smoc', 'w').write(str(cache))
                     except EOFError: log('warning', 'Got EOFerror')
+                    except KeyboardInterrupt: 
+                        log('debug', 'Received KeyboardInterrupt. (in chat cycle)')
+                        try: 
+                            if input('\nExit to main menu? [y/n]: ') in ['y', 'Y']: 
+                                cls()
+                                raise EOFError
+                        except: pass # To except spaming exception hot keys (like KeyboardInterrupt)
     except EOFError: pass 
     except KeyboardInterrupt: 
         log('debug', 'Received KeyboardInterrupt.')
@@ -353,7 +364,7 @@ while True:
         except EOFError: exit()
         except: pass # To except spaming exception hot keys (like KeyboardInterrupt)
     except Exception as error:
-        if main.version.VersionType == 'Beta' or main.RaiseErrorWhenHappen == True: raise # To handle errors if using Beta version (for debugging exceptions)
+        if main.version.VersionType == 'Beta' or main.RaiseErrorWhenHappen == True or main.version.Mode == 'NonPublic': raise # To handle errors if using Beta version (for debugging exceptions)
         try:
             log('error', f'Excepted: {error}', 'runtime')
             cls()
