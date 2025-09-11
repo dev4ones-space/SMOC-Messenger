@@ -1,5 +1,5 @@
 # #
-import os, platform, ast, inspect, re, time
+import os, platform, ast, inspect, re, time, sys
 try: from wopw import *
 except ModuleNotFoundError: 
     input('error: internal lib "wopw" was not found. Messenger will abort run. (make sure you have cloned this repo correctly, or didnt aborted cloning in proccess)')
@@ -21,7 +21,7 @@ class main:
         Version = 1.0
         Mode = 'DoneRun' # 2 States only: NonPublic, DoneRun
         VersionType = 'Release' # Alpha, Beta, Release
-        BuildCount = 1
+        BuildCount = 2
         Build = f'{str(Version).replace('.', '')}{VersionType[0]}{BuildCount}'
         All = f'Version: {Version}\nVersion Type: {VersionType}\nBuild: {Build}'
         class InternalShell:
@@ -195,178 +195,177 @@ error = None # To abort error on: except EOFError: ... ; when in normal version:
 act = main.activities # Shortcut for main.activities
 log = act.Log
 # # Pre-run
-if __name__ != '__main__': 
-    log('debug', 'Detected running in import/from mode', 'prerun')
-    exit()  # To abort launching TUI, if using in import
 if platform.system() not in main.SupportedPlatforms: 
     log('debug', f'Using unsupported OS: {platform.system()}', 'prerun')
     act.UnsupportedOS()
-# # Reading SN
-log('debug', 'Reading SN...', 'prerun')
-progress('Reading serial number...')
-sn = machine.GetSerialNumber()
-if sn == -1 or sn in ['', ' ', None]:
-    log('error', 'Failed to read serial number (wopw.machine.GetSerialNumber return -1 or blank, which is exception when it cannot find SN)', 'prerun')
-    print(f'{err} reading failed... One layer encryption/decryption available only')
-    sn = ''
-# # Reading main.smoc
-log('debug', 'Reading main configuration file (main.smoc)', 'prerun')
-progress('Reading main configuration file...')
-try: 
-    main.main_conf = act.Dict('main.smoc')
-    if main.main_conf == -3: raise FileNotFoundError
-except Exception as e: 
-    log('error', f'Excepted error: {e}', 'prerun')
-    if input(f'{err} main conf file (main.smoc) was not found. Create it? [y/n]: ') in ['y', 'Y']: 
-        if act.MakeMainConfigurationFile_TUI(sn) == -4: 
-            print('Main configuration file abort.')
-            exit()
-    progress('Reading main.smoc...')
-    try: main.main_conf = act.Dict('main.smoc')
-    except: exit()
-# Main
-log('debug', 'Starting runtime...')
-while True:
+if __name__ == '__main__': # 10R2: was found out exit() aborts entire python3 proccess even in import.
+    # # Reading SN      
+    log('debug', 'Reading SN...', 'prerun')
+    progress('Reading serial number...')
+    sn = machine.GetSerialNumber()
+    if sn == -1 or sn in ['', ' ', None]:
+        log('error', 'Failed to read serial number (wopw.machine.GetSerialNumber return -1 or blank, which is exception when it cannot find SN)', 'prerun')
+        print(f'{err} reading failed... One layer encryption/decryption available only')
+        sn = ''
+    # # Reading main.smoc
+    log('debug', 'Reading main configuration file (main.smoc)', 'prerun')
+    progress('Reading main configuration file...')
     try: 
-        while True: 
-            cls()
-            chat_name = input('Chat name to open: ')
-            cls()
-            if chat_name == 'i': act.AdvancedMenu()
-            else: 
-                log('debug', f'Reading chat: {chat_name}', 'runtime')
-                progress('Reading chat...')
-                try: chat = open(f'{chat_name}/chat.smoc')
-                except FileNotFoundError: 
-                    log('warning', 'Got FileNotFoundError. Looking like there is no chat', 'runtime')
-                    if input(f'{err} chat was not found. Create new chat? [y/n]: ') in ['y', 'Y']: act.CreateLocalChat_TUI(chat_name)
-                    else: break
-                chat_passwd = input('Password to decrypt chat: ')
-                progress('Decrypting chat...')
-                try: chat = smessage.main.activities.Decrypt(main.activities.Dict(f'{chat_name}/chat.smoc'), chat_passwd)
-                except Exception as e: 
-                    log('error', f'Excepted: {e}. Looking like password for chat is wrong', 'runtime')
-                    prompt(f'{err} password for decrypt is wrong.')
-                    break
+        main.main_conf = act.Dict('main.smoc')
+        if main.main_conf == -3: raise FileNotFoundError
+    except Exception as e: 
+        log('error', f'Excepted error: {e}', 'prerun')
+        if input(f'{err} main conf file (main.smoc) was not found. Create it? [y/n]: ') in ['y', 'Y']: 
+            if act.MakeMainConfigurationFile_TUI(sn) == -4: 
+                print('Main configuration file abort.')
+                exit()
+        progress('Reading main.smoc...')
+        try: main.main_conf = act.Dict('main.smoc')
+        except: exit()
+    # Main
+    log('debug', 'Starting runtime...')
+    while True:
+        try: 
+            while True: 
                 cls()
-                log('debug', 'Decrypting main configuration file connection data...', 'runtime')
-                progress('Decrypting data...')
-                cache = input('Password to decrypt data for syncing: ')
-                progress('Decrypting first layer...')
-                log('debug', 'Decrypting first layer', 'runtime')
-                try: done_data = {
-                    'domain': smessage.main.activities.Decrypt(main.main_conf['domain'], sn), 
-                    'port': smessage.main.activities.Decrypt(main.main_conf['port'], sn),
-                    'user': smessage.main.activities.Decrypt(main.main_conf['user'], sn),
-                    'passwd': smessage.main.activities.Decrypt(main.main_conf['passwd'], sn)
-                }
-                except Exception as e: 
-                    log('error', f'Excepted: {e}. Looking like machine SN is not same', 'runtime')
-                    prompt(f'{err} failed to decrypt. Possible reasons: main.smoc created on different machine, corrupted data')
-                    break
-                progress('Decrypting second layer...')
-                log('debug', 'Decrypting second layer...', 'runtime')
-                try: done_data = {
-                    'domain': smessage.main.activities.Decrypt(done_data['domain'], cache), 
-                    'port': smessage.main.activities.Decrypt(done_data['port'], cache),
-                    'user': smessage.main.activities.Decrypt(done_data['user'], cache),
-                    'passwd': smessage.main.activities.Decrypt(done_data['passwd'], cache)
-                }
-                except: 
-                    prompt(f'{err} failed to decrypt. Possible reasons: wrong password, corrupted data')
-                    break
-                progress('Decrypting chat conf...')
-                log('debug', 'Decrypting chat conf...', 'runtime')
-                chat_conf = act.Dict(f'{chat_name}/chat-conf.smoc')
-                chat_conf = {
-                    'codename': smessage.main.activities.Decrypt(chat_conf['codename'], chat_passwd),
-                    'sync-passwd': smessage.main.activities.Decrypt(chat_conf['sync-passwd'], chat_passwd)
-                }
-                log('debug', 'All data prepared, starting chat', 'runtime')
-                while True:
-                    try:
-                        cls()
-                        cache = input(f'{chat}\n\n  {color.foreground_st.green}{font.bold}Message:{color.end} ')
-                        if cache in ['', ' ']: 
+                chat_name = input('Chat name to open: ')
+                cls()
+                if chat_name == 'i': act.AdvancedMenu()
+                else: 
+                    log('debug', f'Reading chat: {chat_name}', 'runtime')
+                    progress('Reading chat...')
+                    try: chat = open(f'{chat_name}/chat.smoc')
+                    except FileNotFoundError: 
+                        log('warning', 'Got FileNotFoundError. Looking like there is no chat', 'runtime')
+                        if input(f'{err} chat was not found. Create new chat? [y/n]: ') in ['y', 'Y']: act.CreateLocalChat_TUI(chat_name)
+                        else: break
+                    chat_passwd = input('Password to decrypt chat: ')
+                    progress('Decrypting chat...')
+                    try: chat = smessage.main.activities.Decrypt(main.activities.Dict(f'{chat_name}/chat.smoc'), chat_passwd)
+                    except Exception as e: 
+                        log('error', f'Excepted: {e}. Looking like password for chat is wrong', 'runtime')
+                        prompt(f'{err} password for decrypt is wrong.')
+                        break
+                    cls()
+                    log('debug', 'Decrypting main configuration file connection data...', 'runtime')
+                    progress('Decrypting data...')
+                    cache = input('Password to decrypt data for syncing: ')
+                    progress('Decrypting first layer...')
+                    log('debug', 'Decrypting first layer', 'runtime')
+                    try: done_data = {
+                        'domain': smessage.main.activities.Decrypt(main.main_conf['domain'], sn), 
+                        'port': smessage.main.activities.Decrypt(main.main_conf['port'], sn),
+                        'user': smessage.main.activities.Decrypt(main.main_conf['user'], sn),
+                        'passwd': smessage.main.activities.Decrypt(main.main_conf['passwd'], sn)
+                    }
+                    except Exception as e: 
+                        log('error', f'Excepted: {e}. Looking like machine SN is not same', 'runtime')
+                        prompt(f'{err} failed to decrypt. Possible reasons: main.smoc created on different machine, corrupted data')
+                        break
+                    progress('Decrypting second layer...')
+                    log('debug', 'Decrypting second layer...', 'runtime')
+                    try: done_data = {
+                        'domain': smessage.main.activities.Decrypt(done_data['domain'], cache), 
+                        'port': smessage.main.activities.Decrypt(done_data['port'], cache),
+                        'user': smessage.main.activities.Decrypt(done_data['user'], cache),
+                        'passwd': smessage.main.activities.Decrypt(done_data['passwd'], cache)
+                    }
+                    except: 
+                        prompt(f'{err} failed to decrypt. Possible reasons: wrong password, corrupted data')
+                        break
+                    progress('Decrypting chat conf...')
+                    log('debug', 'Decrypting chat conf...', 'runtime')
+                    chat_conf = act.Dict(f'{chat_name}/chat-conf.smoc')
+                    chat_conf = {
+                        'codename': smessage.main.activities.Decrypt(chat_conf['codename'], chat_passwd),
+                        'sync-passwd': smessage.main.activities.Decrypt(chat_conf['sync-passwd'], chat_passwd)
+                    }
+                    log('debug', 'All data prepared, starting chat', 'runtime')
+                    while True:
+                        try:
                             cls()
-                            log('debug', 'Syncing chat...', 'runtime')
-                            progress('Syncing chat...')
-                            try: 
-                                ssh.connect(done_data['domain'], done_data['port'], done_data['user'], done_data['passwd'])
-                                stdin, stdout, stderr = ssh.exec_command(f'python3 /home/{done_data['user']}/SMOC-Server/server.py receive {chat_conf['codename']} {main.main_conf['current_user']}')
-                                got = ''
-                                for line in stdout: got += line.strip()
-                            except paramiko.SSHException as e: 
-                                log('error', f'Got {e}. Connection to server failed', 'runtime')
-                                prompt(f'Connection failed...\n\nParamiko error: {e}')
-                                raise EOFError
-                            if got.replace('\n', '') == '-1': 
-                                log('debug', 'No messages was found. Raising EOFError to get to main page', 'runtime')
-                                raise EOFError # No messages was found
+                            cache = input(f'{chat}\n\n  {color.foreground_st.green}{font.bold}Message:{color.end} ')
+                            if cache in ['', ' ']: 
+                                cls()
+                                log('debug', 'Syncing chat...', 'runtime')
+                                progress('Syncing chat...')
+                                try: 
+                                    ssh.connect(done_data['domain'], done_data['port'], done_data['user'], done_data['passwd'])
+                                    stdin, stdout, stderr = ssh.exec_command(f'python3 /home/{done_data['user']}/SMOC-Server/server.py receive {chat_conf['codename']} {main.main_conf['current_user']}')
+                                    got = ''
+                                    for line in stdout: got += line.strip()
+                                except paramiko.SSHException as e: 
+                                    log('error', f'Got {e}. Connection to server failed', 'runtime')
+                                    prompt(f'Connection failed...\n\nParamiko error: {e}')
+                                    raise EOFError
+                                if got.replace('\n', '') == '-1': 
+                                    log('debug', 'No messages was found. Raising EOFError to get to main page', 'runtime')
+                                    raise EOFError # No messages was found
+                                else: 
+                                    log('debug', 'Received new message from server', 'runtime')
+                                    progress('Got new message! Decrypting...')
+                                    cache = act.DecrpytReceivedMessage(got, chat_conf['sync-passwd'])
+                                    if cache == '': 
+                                        log('warning', 'Looking like got a unecrypted message (probably was sent by hand from server)', 'runtime')
+                                        if input('Looking like received message is unencrypted. Do you want to read it? [y/n]: ') in ['y', 'Y']: cache = f'({color.foreground_st.red}unencrypted{color.end}) {got}'
+                                        else: raise EOFError
+                                    chat = f'{chat}\n{cache}'
+                                    progress('Writing changes to local chat...')
+                                    log('debug', 'Writing changes to chat after syncing', 'runtime')
+                                    cache = smessage.main.activities.Encrypt(chat, chat_passwd)
+                                    open(f'{chat_name}/chat.smoc', 'w').write(str(cache))
                             else: 
-                                log('debug', 'Received new message from server', 'runtime')
-                                progress('Got new message! Decrypting...')
-                                cache = act.DecrpytReceivedMessage(got, chat_conf['sync-passwd'])
-                                if cache == '': 
-                                    log('warning', 'Looking like got a unecrypted message (probably was sent by hand from server)', 'runtime')
-                                    if input('Looking like received message is unencrypted. Do you want to read it? [y/n]: ') in ['y', 'Y']: cache = f'({color.foreground_st.red}unencrypted{color.end}) {got}'
-                                    else: raise EOFError
-                                chat = f'{chat}\n{cache}'
+                                if cache == '$quote%':
+                                    log('debug', 'Entered quote mode', 'runtime')
+                                    print('Entered quote, CTRL+C to exit from.')
+                                    try:
+                                        cache1 = input('quote>')
+                                        while True: cache1 = f'{cache1}\n {input('quote>')}'
+                                    except KeyboardInterrupt: pass
+                                    cache = cache1
+                                cache1 = input('Send to: ')
+                                progress('Sending message to server...')
+                                log('debug', 'Sending message to server...', 'runtime')
+                                cache2 = f'{color.foreground_st.blue}{main.main_conf['current_user']}{color.end}: {cache}'
+                                message = smessage.main.activities.Encrypt(cache2, chat_conf['sync-passwd'])
+                                try: 
+                                    ssh.connect(done_data['domain'], done_data['port'], done_data['user'], done_data['passwd'])
+                                    stdin, stdout, stderr = ssh.exec_command(f"python3 /home/{done_data['user']}/SMOC-Server/server.py send {chat_conf['codename']} '''{message}''' {cache1}")
+                                    for line in stdout: cache += line.strip()
+                                except socket.gaierror:
+                                    log('error', 'Got error: socket.gaierror. Looking like there is no internet', 'runtime')
+                                    prompt('Cannot connect to server, looking like there is not internet connection or host is not searchable')
+                                    raise EOFError
+                                except paramiko.SSHException as e: 
+                                    prompt(f'Connection failed...\n\nParamiko error: {e}')
+                                    raise EOFError
+                                ssh.close()
+                                chat = f'{chat}\n{cache2}'
                                 progress('Writing changes to local chat...')
-                                log('debug', 'Writing changes to chat after syncing', 'runtime')
                                 cache = smessage.main.activities.Encrypt(chat, chat_passwd)
                                 open(f'{chat_name}/chat.smoc', 'w').write(str(cache))
-                        else: 
-                            if cache == '$quote%':
-                                log('debug', 'Entered quote mode', 'runtime')
-                                print('Entered quote, CTRL+C to exit from.')
-                                try:
-                                    cache1 = input('quote>')
-                                    while True: cache1 = f'{cache1}\n {input('quote>')}'
-                                except KeyboardInterrupt: pass
-                                cache = cache1
-                            cache1 = input('Send to: ')
-                            progress('Sending message to server...')
-                            log('debug', 'Sending message to server...', 'runtime')
-                            cache2 = f'{color.foreground_st.blue}{main.main_conf['current_user']}{color.end}: {cache}'
-                            message = smessage.main.activities.Encrypt(cache2, chat_conf['sync-passwd'])
+                        except EOFError: log('warning', 'Got EOFerror')
+                        except KeyboardInterrupt: 
+                            log('debug', 'Received KeyboardInterrupt. (in chat cycle)')
                             try: 
-                                ssh.connect(done_data['domain'], done_data['port'], done_data['user'], done_data['passwd'])
-                                stdin, stdout, stderr = ssh.exec_command(f"python3 /home/{done_data['user']}/SMOC-Server/server.py send {chat_conf['codename']} '''{message}''' {cache1}")
-                                for line in stdout: cache += line.strip()
-                            except socket.gaierror:
-                                log('error', 'Got error: socket.gaierror. Looking like there is no internet', 'runtime')
-                                prompt('Cannot connect to server, looking like there is not internet connection or host is not searchable')
-                                raise EOFError
-                            except paramiko.SSHException as e: 
-                                prompt(f'Connection failed...\n\nParamiko error: {e}')
-                                raise EOFError
-                            ssh.close()
-                            chat = f'{chat}\n{cache2}'
-                            progress('Writing changes to local chat...')
-                            cache = smessage.main.activities.Encrypt(chat, chat_passwd)
-                            open(f'{chat_name}/chat.smoc', 'w').write(str(cache))
-                    except EOFError: log('warning', 'Got EOFerror')
-                    except KeyboardInterrupt: 
-                        log('debug', 'Received KeyboardInterrupt. (in chat cycle)')
-                        try: 
-                            if input('\nExit to main menu? [y/n]: ') in ['y', 'Y']: 
-                                cls()
-                                raise EOFError
-                        except: pass # To except spaming exception hot keys (like KeyboardInterrupt)
-    except EOFError: pass 
-    except KeyboardInterrupt: 
-        log('debug', 'Received KeyboardInterrupt.')
-        try: 
-            if input('\nExit? [y/n]: ') in ['y', 'Y']: 
+                                if input('\nExit to main menu? [y/n]: ') in ['y', 'Y']: 
+                                    cls()
+                                    raise EOFError
+                            except: pass # To except spaming exception hot keys (like KeyboardInterrupt)
+        except EOFError: pass 
+        except KeyboardInterrupt: 
+            log('debug', 'Received KeyboardInterrupt.')
+            try: 
+                if input('\nExit? [y/n]: ') in ['y', 'Y']: 
+                    cls()
+                    exit()
+            except EOFError: exit()
+            except: pass # To except spaming exception hot keys (like KeyboardInterrupt)
+        except Exception as error:
+            if main.version.VersionType == 'Beta' or main.RaiseErrorWhenHappen == True or main.version.Mode == 'NonPublic': raise # To handle errors if using Beta version (for debugging exceptions)
+            try:
+                log('error', f'Excepted: {error}', 'runtime')
                 cls()
-                exit()
-        except EOFError: exit()
-        except: pass # To except spaming exception hot keys (like KeyboardInterrupt)
-    except Exception as error:
-        if main.version.VersionType == 'Beta' or main.RaiseErrorWhenHappen == True or main.version.Mode == 'NonPublic': raise # To handle errors if using Beta version (for debugging exceptions)
-        try:
-            log('error', f'Excepted: {error}', 'runtime')
-            cls()
-            prompt(f'Unexcepted error occured: {error}')
-        except: pass
+                prompt(f'Unexcepted error occured: {error}')
+            except: pass
+else: log('debug', 'Detected running in import/from mode', 'prerun')
