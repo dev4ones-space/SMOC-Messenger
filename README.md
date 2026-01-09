@@ -16,8 +16,6 @@ SMOC - is messenger with end-to-end (kind of) feature, also using safe method at
    - For macOS (darwin): `brew install pyinstaller` (make sure brew is installed, if not - install trough their [offical website](https://brew.sh))
 3. Run `python3 build.py` (or use your own python enviroment)
 
-# Warning: DO NOT USE PUBLIC SERVERS, ONES YOU DON'T TRUST 
-# [Documentation](https://dev4ones.space/documentation/smoc) (will be completed soon)
 # Other info:
 
 **When creating chat**
